@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Our Time in Hawaii</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>Our Time in Hawaii</h1>
+        <p>A collection of memories from our time living on the islands.</p>
+    </header>
+
+    <main>
+
+        <section>
+            <h2>Memories</h2>
+
+            <div id="memories"></div>
+        </section>
+
+        <section>
+            <h2>Memories</h2>
+
+            <p>
+                Photos and stories will eventually be displayed here.
+            </p>
+        </section>
+
+    </main>
+	<script>
+    fetch("/api/memories")
+        .then(response => response.json())
+        .then(data => {
+            const memoriesContainer = document.getElementById("memories");
+
+            data.memories.forEach(memory => {
+                const memoryElement = document.createElement("div");
+
+                memoryElement.innerHTML = `
+                    <h3>${memory.title}</h3>
+                    <p>${memory.location}</p>
+                `;
+
+                memoriesContainer.appendChild(memoryElement);
+            });
+        });
+</script>
+</body>
+</html><!DOCTYPE html>
+<html>
+<head>
+    <title>Our Time in Hawaii</title>
+</head>
+
+<body>
+    <h1>Our Time in Hawaii</h1>
+
+    <p>
+        A collection of memories from our time living in Hawaii.
+    </p>
+</body>
+</html>
+
