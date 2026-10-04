@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,51 +20,106 @@
     <main>
 
         <section>
-            <h2>Memories</h2>
+            <h2>Add a Memory</h2>
 
-            <div id="memories"></div>
+            <form id="memory-form">
+
+                <label for="title">Title</label>
+                <input type="text" id="title" required>
+
+                <label for="location">Location</label>
+                <input type="text" id="location">
+
+                <label for="memory-date">Date</label>
+                <input type="date" id="memory-date">
+
+                <label for="description">Description</label>
+                <textarea id="description"></textarea>
+
+                <button type="submit">Add Memory</button>
+
+            </form>
         </section>
 
         <section>
             <h2>Memories</h2>
 
-            <p>
-                Photos and stories will eventually be displayed here.
-            </p>
+            <div id="memories"></div>
         </section>
 
     </main>
-	<script>
-    fetch("/api/memories")
-        .then(response => response.json())
-        .then(data => {
-            const memoriesContainer = document.getElementById("memories");
 
-            data.memories.forEach(memory => {
-                const memoryElement = document.createElement("div");
+    <script>
+        function loadMemories() {
+            fetch("/api/memories")
+                .then(response => response.json())
+                .then(data => {
+                    const memoriesContainer =
+                        document.getElementById("memories");
 
-                memoryElement.innerHTML = `
-                    <h3>${memory.title}</h3>
-                    <p>${memory.location}</p>
-                `;
+                    memoriesContainer.innerHTML = "";
 
-                memoriesContainer.appendChild(memoryElement);
+                    data.memories.forEach(memory => {
+                        const memoryElement =
+                            document.createElement("div");
+
+                        memoryElement.innerHTML = `
+                            <h3>${memory.title}</h3>
+                            <p>${memory.location || ""}</p>
+                            <p>${memory.memory_date || ""}</p>
+                            <p>${memory.description || ""}</p>
+                        `;
+
+                        memoriesContainer.appendChild(memoryElement);
+                    });
+                });
+        }
+
+
+        document.getElementById("memory-form")
+            .addEventListener("submit", function(event) {
+
+                event.preventDefault();
+
+                const memory = {
+                    title: document.getElementById("title").value,
+                    location: document.getElementById("location").value,
+                    memory_date:
+                        document.getElementById("memory-date").value || null,
+                    description:
+                        document.getElementById("description").value,
+                    image_path: null
+                };
+
+                fetch("/api/memories", {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify(memory)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Failed to add memory");
+                    }
+
+                    return response.json();
+                })
+                .then(() => {
+                    document.getElementById("memory-form").reset();
+                    loadMemories();
+                })
+                .catch(error => {
+                    console.error(error);
+                });
             });
-        });
-</script>
-</body>
-</html><!DOCTYPE html>
-<html>
-<head>
-    <title>Our Time in Hawaii</title>
-</head>
 
-<body>
-    <h1>Our Time in Hawaii</h1>
 
-    <p>
-        A collection of memories from our time living in Hawaii.
-    </p>
+        loadMemories();
+    </script>
+
 </body>
+
 </html>
-
