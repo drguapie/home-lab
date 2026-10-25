@@ -50,16 +50,19 @@
     </main>
 
     <script>
+
         function loadMemories() {
             fetch("/api/memories")
                 .then(response => response.json())
                 .then(data => {
+
                     const memoriesContainer =
                         document.getElementById("memories");
 
                     memoriesContainer.innerHTML = "";
 
                     data.memories.forEach(memory => {
+
                         const memoryElement =
                             document.createElement("div");
 
@@ -68,11 +71,41 @@
                             <p>${memory.location || ""}</p>
                             <p>${memory.memory_date || ""}</p>
                             <p>${memory.description || ""}</p>
+                            ${memory.image_path ? `
+   				 <img src="${memory.image_path}"
+        			 alt="${memory.title}"
+       				 class="memory-image">
+			    ` : ""}
+                            <button onclick="deleteMemory(${memory.id})">
+                                Delete
+                            </button>
                         `;
 
                         memoriesContainer.appendChild(memoryElement);
                     });
                 });
+        }
+
+
+        function deleteMemory(memoryId) {
+
+            fetch(`/api/memories/${memoryId}`, {
+                method: "DELETE"
+            })
+            .then(response => {
+
+                if (!response.ok) {
+                    throw new Error("Failed to delete memory");
+                }
+
+                return response.json();
+            })
+            .then(() => {
+                loadMemories();
+            })
+            .catch(error => {
+                console.error(error);
+            });
         }
 
 
@@ -101,6 +134,7 @@
                     body: JSON.stringify(memory)
                 })
                 .then(response => {
+
                     if (!response.ok) {
                         throw new Error("Failed to add memory");
                     }
@@ -108,7 +142,9 @@
                     return response.json();
                 })
                 .then(() => {
+
                     document.getElementById("memory-form").reset();
+
                     loadMemories();
                 })
                 .catch(error => {
@@ -118,6 +154,7 @@
 
 
         loadMemories();
+
     </script>
 
 </body>

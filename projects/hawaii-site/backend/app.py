@@ -2,15 +2,16 @@ from flask import Flask, jsonify, request
 import psycopg2
 import os
 
+
 app = Flask(__name__)
 
 
 def get_db_connection():
     return psycopg2.connect(
-        host=os.environ["DB_HOST"],
-        database=os.environ["POSTGRES_DB"],
-        user=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"]
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("POSTGRES_DB"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD")
     )
 
 
@@ -73,6 +74,8 @@ def add_memory():
     conn.close()
 
     return jsonify({"message": "Memory added successfully"}), 201
+
+
 @app.route("/api/memories/<int:memory_id>", methods=["DELETE"])
 def delete_memory(memory_id):
     conn = get_db_connection()
@@ -88,7 +91,8 @@ def delete_memory(memory_id):
     cursor.close()
     conn.close()
 
-    return jsonify({"message": "Memory deleted successfully"})
+    return jsonify({"message": "Memory deleted successfully"}), 200
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

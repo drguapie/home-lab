@@ -23,3 +23,48 @@ img {
     max-width: 100%;
     height: auto;
 }
+
+/* Memory cards */
+
+#memories {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: 24px;
+}
+
+#memories > div {
+    background-color: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+#memories h3 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+
+.memory-image {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin: 12px 0;
+}
+
+/* Mobile layout */
+
+@media (max-width: 600px) {
+    body {
+        padding: 20px 15px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    .memory-image {
+        height: 200px;
+    }
+}
