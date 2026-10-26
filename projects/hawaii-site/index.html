@@ -34,9 +34,12 @@
                 <input type="date" id="memory-date">
 
                 <label for="description">Description</label>
-                <textarea id="description"></textarea>
+		<textarea id="description"></textarea>
 
-                <button type="submit">Add Memory</button>
+		<label for="photo">Photograph</label>
+		<input type="file" id="photo" accept="image/jpeg,image/png,image/webp">
+
+		<button type="submit">Add Memory</button>
 
             </form>
         </section>
@@ -82,8 +85,8 @@
                         `;
 
                         memoriesContainer.appendChild(memoryElement);
-                    });
                 });
+	     });
         }
 
 
@@ -109,48 +112,78 @@
         }
 
 
-        document.getElementById("memory-form")
-            .addEventListener("submit", function(event) {
+document.getElementById("memory-form")
+    .addEventListener("submit", async function(event) {
 
-                event.preventDefault();
+        event.preventDefault();
 
-                const memory = {
-                    title: document.getElementById("title").value,
-                    location: document.getElementById("location").value,
-                    memory_date:
-                        document.getElementById("memory-date").value || null,
-                    description:
-                        document.getElementById("description").value,
-                    image_path: null
-                };
+        const form = event.currentTarget;
+        const submitButton = form.querySelector('button[type="submit"]');
 
-                fetch("/api/memories", {
+        const memory = {
+            title: document.getElementById("title").value,
+            location: document.getElementById("location").value,
+            memory_date:
+                document.getElementById("memory-date").value || null,
+            description:
+                document.getElementById("description").value,
+            image_path: null
+        };
+
+        const photo = document.getElementById("photo").files[0];
+
+        submitButton.disabled = true;
+
+        try {
+
+            // Upload the photograph first, if one was selected.
+            if (photo) {
+
+                const formData = new FormData();
+                formData.append("photo", photo);
+
+                const uploadResponse = await fetch("/api/upload", {
                     method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-
-                    body: JSON.stringify(memory)
-                })
-                .then(response => {
-
-                    if (!response.ok) {
-                        throw new Error("Failed to add memory");
-                    }
-
-                    return response.json();
-                })
-                .then(() => {
-
-                    document.getElementById("memory-form").reset();
-
-                    loadMemories();
-                })
-                .catch(error => {
-                    console.error(error);
+                    body: formData
                 });
+
+                if (!uploadResponse.ok) {
+                    throw new Error("Failed to upload photograph");
+                }
+
+                const uploadResult = await uploadResponse.json();
+
+                memory.image_path = uploadResult.image_path;
+            }
+
+            // Save the memory, including its photograph's path.
+            const memoryResponse = await fetch("/api/memories", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(memory)
             });
+
+            if (!memoryResponse.ok) {
+                throw new Error("Failed to add memory");
+            }
+
+            form.reset();
+            loadMemories();
+
+        } catch (error) {
+
+            console.error(error);
+            alert(error.message);
+
+        } finally {
+
+            submitButton.disabled = false;
+
+        }
+    });
+
 
 
         loadMemories();

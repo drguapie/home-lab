@@ -1,10 +1,17 @@
 from flask import Flask, jsonify, request
 import psycopg2
 import os
-
+import uuid
+from pathlib import Path
+from werkzeug.utils import secure_filename
+from PIL import Image, UnidentifiedImageError
+from io import BytesIO
 
 app = Flask(__name__)
+UPLOAD_FOLDER = Path("/app/uploads")
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 def get_db_connection():
     return psycopg2.connect(
@@ -93,6 +100,50 @@ def delete_memory(memory_id):
 
     return jsonify({"message": "Memory deleted successfully"}), 200
 
+@app.route("/api/upload", methods=["POST"])
+def upload_photo():
+    if "photo" not in request.files:
+        return jsonify({"error": "No photo provided"}), 400
+
+    photo = request.files["photo"]
+
+    if not photo.filename:
+        return jsonify({"error": "No file selected"}), 400
+
+    original_name = secure_filename(photo.filename)
+    extension = Path(original_name).suffix.lower().lstrip(".")
+
+    if extension not in ALLOWED_EXTENSIONS:
+        return jsonify({"error": "Unsupported file type"}), 400
+
+    image_bytes = photo.read()
+
+    try:
+        with Image.open(BytesIO(image_bytes)) as image:
+            detected_format = image.format
+            image.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError):
+        return jsonify({"error": "Invalid image file"}), 400
+
+    expected_formats = {
+        "jpg": {"JPEG", "MPO"},
+        "jpeg": {"JPEG", "MPO"},
+        "png": {"PNG"},
+        "webp": {"WEBP"}
+    }
+
+    if detected_format not in expected_formats[extension]:
+        return jsonify({"error": "Image format does not match extension"}), 400
+
+    filename = f"{uuid.uuid4().hex}.{extension}"
+
+    with open(UPLOAD_FOLDER / filename, "wb") as saved_file:
+        saved_file.write(image_bytes)
+
+    return jsonify({
+        "message": "Photo uploaded successfully",
+        "image_path": f"uploads/{filename}"
+    }), 201
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
