@@ -82,7 +82,83 @@ def add_memory():
 
     return jsonify({"message": "Memory added successfully"}), 201
 
+@app.route("/api/memories/<int:memory_id>", methods=["PUT"])
+def update_memory(memory_id):
 
+    # Retrieve the JSON data sent by the admin dashboard.
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid JSON data"}), 400
+
+    # Validate the memory title.
+    title = data.get("title")
+
+    if not isinstance(title, str) or not title.strip():
+        return jsonify({"error": "A memory title is required"}), 400
+
+    # Validate optional text fields.
+    for field in ("location", "description", "image_path"):
+        if data.get(field) is not None and not isinstance(data[field], str):
+            return jsonify({"error": f"Invalid {field}"}), 400
+
+    # Validate the date if one was provided.
+    from datetime import date
+
+    memory_date = data.get("memory_date")
+
+    if memory_date:
+        try:
+            date.fromisoformat(memory_date)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid date format"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        # Update the existing memory using its unique ID.
+        cursor.execute(
+            """
+            UPDATE memories
+            SET title = %s,
+                location = %s,
+                memory_date = %s,
+                description = %s,
+                image_path = %s
+            WHERE id = %s
+            """,
+            (
+                title.strip(),
+                data.get("location"),
+                memory_date or None,
+                data.get("description"),
+                data.get("image_path"),
+                memory_id
+            )
+        )
+
+        # Check whether the requested memory exists.
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": "Memory not found"}), 404
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Memory updated successfully"
+        }), 200
+
+    except Exception:
+        conn.rollback()
+        app.logger.exception("Failed to update memory")
+        return jsonify({"error": "Unable to update memory"}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+        
 @app.route("/api/memories/<int:memory_id>", methods=["DELETE"])
 def delete_memory(memory_id):
     conn = get_db_connection()

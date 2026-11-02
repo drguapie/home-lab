@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Hawaii Memories | Admin Dashboard</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>Hawaii Memories Admin</h1>
+        <p>Create, view, edit, and delete memories.</p>
+    </header>
+
+    <main>
+
+        <!-- ADD MEMORY -->
+        <section>
+            <h2>Add a Memory</h2>
+
+            <form id="memory-form">
+
+                <label for="title">Title</label>
+                <input type="text" id="title" required>
+
+                <label for="location">Location</label>
+                <input type="text" id="location">
+
+                <label for="memory-date">Date</label>
+                <input type="date" id="memory-date">
+
+                <label for="description">Description</label>
+                <textarea id="description"></textarea>
+
+                <label for="photo">Photograph</label>
+                <input
+                    type="file"
+                    id="photo"
+                    accept="image/jpeg,image/png,image/webp"
+                >
+
+                <button type="submit">Add Memory</button>
+
+            </form>
+        </section>
+
+        <!-- MEMORIES -->
+        <section>
+            <h2>Memories</h2>
+            <div id="memories"></div>
+        </section>
+
+    </main>
+
+    <script>
+
+        // Retrieve memories from Flask.
+        async function loadMemories() {
+
+            const container = document.getElementById("memories");
+
+            try {
+                const response = await fetch("/api/memories");
+
+                if (!response.ok) {
+                    throw new Error("Failed to load memories");
+                }
+
+                const data = await response.json();
+
+                container.replaceChildren();
+
+                data.memories.forEach(memory => {
+
+                    const polaroid = document.createElement("div");
+
+                    polaroid.className = "polaroid";
+                    polaroid.tabIndex = 0;
+                    polaroid.setAttribute("role", "button");
+                    polaroid.setAttribute(
+                        "aria-label",
+                        "Open memory: " + (memory.title || "Untitled Memory")
+                    );
+
+                    if (memory.image_path) {
+
+                        const photo = document.createElement("img");
+
+                        photo.src = memory.image_path;
+                        photo.alt = memory.title || "Hawaii memory";
+                        photo.className = "memory-image";
+
+                        polaroid.appendChild(photo);
+
+                    } else {
+
+                        const placeholder = document.createElement("div");
+
+                        placeholder.className = "photo-placeholder";
+                        placeholder.textContent = "No photograph";
+
+                        polaroid.appendChild(placeholder);
+                    }
+
+                    polaroid.addEventListener("click", () => {
+                        openMemory(memory);
+                    });
+
+                    polaroid.addEventListener("keydown", event => {
+
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openMemory(memory);
+                        }
+                    });
+
+                    container.appendChild(polaroid);
+                });
+
+            } catch (error) {
+
+                console.error(error);
+                container.textContent = "Unable to load memories.";
+            }
+        }
+
+
+        // Upload a photograph and return its stored path.
+        async function uploadPhoto(photo) {
+
+            const formData = new FormData();
+            formData.append("photo", photo);
+
+            const response = await fetch("/api/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to upload photograph");
+            }
+
+            const result = await response.json();
+
+            return result.image_path;
+        }
+
+
+        // Open a memory and display its details.
+        function openMemory(memory) {
+
+            const overlay = document.createElement("div");
+            overlay.className = "memory-overlay";
+
+            const details = document.createElement("div");
+            details.className = "memory-details";
+            details.setAttribute("role", "dialog");
+            details.setAttribute("aria-modal", "true");
+            details.setAttribute(
+                "aria-label",
+                memory.title || "Memory details"
+            );
+
+            const previousFocus = document.activeElement;
+
+            const closeButton = document.createElement("button");
+            closeButton.className = "close-memory";
+            closeButton.textContent = "×";
+            closeButton.setAttribute("aria-label", "Close memory");
+
+            function closeMemory() {
+
+                document.removeEventListener("keydown", handleEscape);
+                overlay.remove();
+
+                if (previousFocus && previousFocus.isConnected) {
+                    previousFocus.focus();
+                }
+            }
+
+            function handleEscape(event) {
+
+                if (event.key === "Escape") {
+                    closeMemory();
+                }
+            }
+
+            closeButton.addEventListener("click", closeMemory);
+            details.appendChild(closeButton);
+
+            // Display photograph.
+            if (memory.image_path) {
+
+                const photo = document.createElement("img");
+
+                photo.src = memory.image_path;
+                photo.alt = memory.title || "Hawaii memory";
+                photo.className = "expanded-photo";
+
+                details.appendChild(photo);
+            }
+
+            // Display title.
+            const title = document.createElement("h2");
+            title.textContent = memory.title || "Untitled Memory";
+            details.appendChild(title);
+
+            // Display date.
+            if (memory.memory_date) {
+
+                const date = document.createElement("p");
+                date.textContent = memory.memory_date;
+                details.appendChild(date);
+            }
+
+            // Display location.
+            if (memory.location) {
+
+                const location = document.createElement("p");
+                location.textContent = memory.location;
+                details.appendChild(location);
+            }
+
+            // Display description.
+            if (memory.description) {
+
+                const description = document.createElement("p");
+                description.textContent = memory.description;
+                details.appendChild(description);
+            }
+
+            // EDIT MEMORY BUTTON
+            const editButton = document.createElement("button");
+            editButton.textContent = "Edit Memory";
+
+            editButton.addEventListener("click", () => {
+                closeMemory();
+                openEditForm(memory);
+            });
+
+            details.appendChild(editButton);
+
+            // DELETE MEMORY BUTTON
+            const deleteButton = document.createElement("button");
+            deleteButton.textContent = "Delete Memory";
+
+            deleteButton.addEventListener("click", async () => {
+
+                const confirmed = confirm(
+                    "Are you sure you want to delete this memory?"
+                );
+
+                if (!confirmed) {
+                    return;
+                }
+
+                deleteButton.disabled = true;
+
+                try {
+
+                    const response = await fetch(
+                        `/api/memories/${memory.id}`,
+                        { method: "DELETE" }
+                    );
+
+                    if (!response.ok) {
+                        throw new Error("Failed to delete memory");
+                    }
+
+                    closeMemory();
+                    await loadMemories();
+
+                } catch (error) {
+
+                    console.error(error);
+                    alert("Could not delete memory.");
+                    deleteButton.disabled = false;
+                }
+            });
+
+            details.appendChild(deleteButton);
+
+            overlay.appendChild(details);
+            document.body.appendChild(overlay);
+
+            overlay.addEventListener("click", event => {
+
+                if (event.target === overlay) {
+                    closeMemory();
+                }
+            });
+
+            document.addEventListener("keydown", handleEscape);
+
+            closeButton.focus();
+        }
+
+
+        // Open the form for editing an existing memory.
+        function openEditForm(memory) {
+
+            const overlay = document.createElement("div");
+            overlay.className = "memory-overlay";
+
+            const details = document.createElement("div");
+            details.className = "memory-details";
+            details.setAttribute("role", "dialog");
+            details.setAttribute("aria-modal", "true");
+            details.setAttribute("aria-label", "Edit memory");
+
+            const previousFocus = document.activeElement;
+
+            const heading = document.createElement("h2");
+            heading.textContent = "Edit Memory";
+            details.appendChild(heading);
+
+            const form = document.createElement("form");
+
+            // Helper function for creating labeled fields.
+            function createField(labelText, type, value) {
+
+                const wrapper = document.createElement("div");
+
+                const label = document.createElement("label");
+                label.textContent = labelText;
+
+                const input = document.createElement("input");
+                input.type = type;
+                input.value = value || "";
+
+                if (type === "text" && labelText === "Title") {
+                    input.required = true;
+                }
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(input);
+
+                form.appendChild(wrapper);
+
+                return input;
+            }
+
+            const titleInput = createField(
+                "Title",
+                "text",
+                memory.title
+            );
+
+            const locationInput = createField(
+                "Location",
+                "text",
+                memory.location
+            );
+
+            const dateInput = createField(
+                "Date",
+                "date",
+                memory.memory_date
+            );
+
+            // Description field.
+            const descriptionLabel = document.createElement("label");
+            descriptionLabel.textContent = "Description";
+
+            const descriptionInput = document.createElement("textarea");
+            descriptionInput.value = memory.description || "";
+
+            form.appendChild(descriptionLabel);
+            form.appendChild(descriptionInput);
+
+            // Optional replacement photograph.
+            const photoLabel = document.createElement("label");
+            photoLabel.textContent = "Replace Photograph (Optional)";
+
+            const photoInput = document.createElement("input");
+            photoInput.type = "file";
+            photoInput.accept = "image/jpeg,image/png,image/webp";
+
+            form.appendChild(photoLabel);
+            form.appendChild(photoInput);
+
+            // Save button.
+            const saveButton = document.createElement("button");
+            saveButton.type = "submit";
+            saveButton.textContent = "Save Changes";
+
+            form.appendChild(saveButton);
+
+            // Cancel button.
+            const cancelButton = document.createElement("button");
+            cancelButton.type = "button";
+            cancelButton.textContent = "Cancel";
+
+            form.appendChild(cancelButton);
+
+            function closeEditForm() {
+
+                document.removeEventListener("keydown", handleEscape);
+                overlay.remove();
+
+                if (previousFocus && previousFocus.isConnected) {
+                    previousFocus.focus();
+                }
+            }
+
+            function handleEscape(event) {
+
+                if (event.key === "Escape") {
+                    closeEditForm();
+                }
+            }
+
+            cancelButton.addEventListener("click", closeEditForm);
+
+            // Save updated memory to PostgreSQL through Flask.
+            form.addEventListener("submit", async event => {
+
+                event.preventDefault();
+
+                saveButton.disabled = true;
+                cancelButton.disabled = true;
+
+                const updatedMemory = {
+                    title: titleInput.value.trim(),
+                    location: locationInput.value,
+                    memory_date: dateInput.value || null,
+                    description: descriptionInput.value,
+
+                    // Preserve the original photo unless replaced.
+                    image_path: memory.image_path || null
+                };
+
+                try {
+
+                    const replacementPhoto = photoInput.files[0];
+
+                    if (replacementPhoto) {
+                        updatedMemory.image_path =
+                            await uploadPhoto(replacementPhoto);
+                    }
+
+                    const response = await fetch(
+                        `/api/memories/${memory.id}`,
+                        {
+                            method: "PUT",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify(updatedMemory)
+                        }
+                    );
+
+                    if (!response.ok) {
+                        throw new Error("Failed to update memory");
+                    }
+
+                    closeEditForm();
+                    await loadMemories();
+
+                } catch (error) {
+
+                    console.error(error);
+                    alert(error.message);
+
+                    saveButton.disabled = false;
+                    cancelButton.disabled = false;
+                }
+            });
+
+            details.appendChild(form);
+            overlay.appendChild(details);
+            document.body.appendChild(overlay);
+
+            overlay.addEventListener("click", event => {
+
+                if (event.target === overlay) {
+                    closeEditForm();
+                }
+            });
+
+            document.addEventListener("keydown", handleEscape);
+
+            titleInput.focus();
+        }
+
+
+        // Handle creating new memories.
+        document.getElementById("memory-form")
+            .addEventListener("submit", async function(event) {
+
+                event.preventDefault();
+
+                const form = event.currentTarget;
+                const submitButton = form.querySelector(
+                    'button[type="submit"]'
+                );
+
+                const memory = {
+                    title: document.getElementById("title").value.trim(),
+                    location: document.getElementById("location").value,
+                    memory_date:
+                        document.getElementById("memory-date").value || null,
+                    description:
+                        document.getElementById("description").value,
+                    image_path: null
+                };
+
+                const photo = document.getElementById("photo").files[0];
+
+                submitButton.disabled = true;
+
+                try {
+
+                    if (photo) {
+                        memory.image_path = await uploadPhoto(photo);
+                    }
+
+                    const response = await fetch("/api/memories", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(memory)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Failed to add memory");
+                    }
+
+                    form.reset();
+                    await loadMemories();
+
+                } catch (error) {
+
+                    console.error(error);
+                    alert(error.message);
+
+                } finally {
+
+                    submitButton.disabled = false;
+                }
+            });
+
+
+        // Load existing memories when the admin page opens.
+        loadMemories();
+
+    </script>
+
+</body>
+
+</html>

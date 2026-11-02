@@ -19,31 +19,7 @@
 
     <main>
 
-        <section>
-            <h2>Add a Memory</h2>
-
-            <form id="memory-form">
-
-                <label for="title">Title</label>
-                <input type="text" id="title" required>
-
-                <label for="location">Location</label>
-                <input type="text" id="location">
-
-                <label for="memory-date">Date</label>
-                <input type="date" id="memory-date">
-
-                <label for="description">Description</label>
-		<textarea id="description"></textarea>
-
-		<label for="photo">Photograph</label>
-		<input type="file" id="photo" accept="image/jpeg,image/png,image/webp">
-
-		<button type="submit">Add Memory</button>
-
-            </form>
-        </section>
-
+        <!-- Public scrapbook gallery -->
         <section>
             <h2>Memories</h2>
 
@@ -54,138 +30,248 @@
 
     <script>
 
-        function loadMemories() {
-            fetch("/api/memories")
-                .then(response => response.json())
-                .then(data => {
+        // Retrieve memories from the Flask API.
+        async function loadMemories() {
 
-                    const memoriesContainer =
-                        document.getElementById("memories");
+            const memoriesContainer =
+                document.getElementById("memories");
 
-                    memoriesContainer.innerHTML = "";
+            try {
 
-                    data.memories.forEach(memory => {
-
-                        const memoryElement =
-                            document.createElement("div");
-
-                        memoryElement.innerHTML = `
-                            <h3>${memory.title}</h3>
-                            <p>${memory.location || ""}</p>
-                            <p>${memory.memory_date || ""}</p>
-                            <p>${memory.description || ""}</p>
-                            ${memory.image_path ? `
-   				 <img src="${memory.image_path}"
-        			 alt="${memory.title}"
-       				 class="memory-image">
-			    ` : ""}
-                            <button onclick="deleteMemory(${memory.id})">
-                                Delete
-                            </button>
-                        `;
-
-                        memoriesContainer.appendChild(memoryElement);
-                });
-	     });
-        }
-
-
-        function deleteMemory(memoryId) {
-
-            fetch(`/api/memories/${memoryId}`, {
-                method: "DELETE"
-            })
-            .then(response => {
+                const response = await fetch("/api/memories");
 
                 if (!response.ok) {
-                    throw new Error("Failed to delete memory");
+                    throw new Error("Failed to load memories");
                 }
 
-                return response.json();
-            })
-            .then(() => {
-                loadMemories();
-            })
-            .catch(error => {
-                console.error(error);
-            });
-        }
+                const data = await response.json();
 
+                // Clear existing memories before displaying new ones.
+                memoriesContainer.replaceChildren();
 
-document.getElementById("memory-form")
-    .addEventListener("submit", async function(event) {
+                data.memories.forEach(memory => {
 
-        event.preventDefault();
+                    // Create the Polaroid frame.
+                    const memoryElement =
+                        document.createElement("div");
 
-        const form = event.currentTarget;
-        const submitButton = form.querySelector('button[type="submit"]');
+                    memoryElement.className = "polaroid";
+                    memoryElement.tabIndex = 0;
 
-        const memory = {
-            title: document.getElementById("title").value,
-            location: document.getElementById("location").value,
-            memory_date:
-                document.getElementById("memory-date").value || null,
-            description:
-                document.getElementById("description").value,
-            image_path: null
-        };
+                    memoryElement.setAttribute("role", "button");
 
-        const photo = document.getElementById("photo").files[0];
+                    memoryElement.setAttribute(
+                        "aria-label",
+                        "Open memory: " + (memory.title || "Untitled Memory")
+                    );
 
-        submitButton.disabled = true;
+                    // Display only the photograph on the scrapbook.
+                    if (memory.image_path) {
 
-        try {
+                        const photo =
+                            document.createElement("img");
 
-            // Upload the photograph first, if one was selected.
-            if (photo) {
+                        photo.src = memory.image_path;
+                        photo.alt = memory.title || "Hawaii memory";
+                        photo.className = "memory-image";
 
-                const formData = new FormData();
-                formData.append("photo", photo);
+                        memoryElement.appendChild(photo);
 
-                const uploadResponse = await fetch("/api/upload", {
-                    method: "POST",
-                    body: formData
+                    } else {
+
+                        const placeholder =
+                            document.createElement("div");
+
+                        placeholder.className = "photo-placeholder";
+                        placeholder.textContent = "No photograph";
+
+                        memoryElement.appendChild(placeholder);
+                    }
+
+                    // Open the expanded memory when clicked.
+                    memoryElement.addEventListener("click", () => {
+                        openMemory(memory);
+                    });
+
+                    // Allow keyboard users to open memories.
+                    memoryElement.addEventListener("keydown", event => {
+
+                        if (
+                            event.key === "Enter" ||
+                            event.key === " "
+                        ) {
+
+                            event.preventDefault();
+                            openMemory(memory);
+                        }
+                    });
+
+                    memoriesContainer.appendChild(memoryElement);
+
                 });
 
-                if (!uploadResponse.ok) {
-                    throw new Error("Failed to upload photograph");
+            } catch (error) {
+
+                console.error("Failed to load memories:", error);
+
+                memoriesContainer.textContent =
+                    "Unable to load memories. Please try again later.";
+            }
+        }
+
+
+        // Open a memory in an expanded overlay.
+        function openMemory(memory) {
+
+            const overlay = document.createElement("div");
+            overlay.className = "memory-overlay";
+
+            const details = document.createElement("div");
+            details.className = "memory-details";
+
+            details.setAttribute("role", "dialog");
+            details.setAttribute("aria-modal", "true");
+
+            details.setAttribute(
+                "aria-label",
+                memory.title || "Memory details"
+            );
+
+            // Remember which element was selected before opening.
+            const previousFocus = document.activeElement;
+
+            // Create the close button.
+            const closeButton = document.createElement("button");
+
+            closeButton.className = "close-memory";
+            closeButton.textContent = "×";
+
+            closeButton.setAttribute(
+                "aria-label",
+                "Close memory"
+            );
+
+
+            // Close the expanded memory.
+            function closeMemory() {
+
+                document.removeEventListener(
+                    "keydown",
+                    handleEscape
+                );
+
+                overlay.remove();
+
+                // Return keyboard focus to the original Polaroid.
+                if (
+                    previousFocus &&
+                    previousFocus.isConnected
+                ) {
+                    previousFocus.focus();
                 }
-
-                const uploadResult = await uploadResponse.json();
-
-                memory.image_path = uploadResult.image_path;
             }
 
-            // Save the memory, including its photograph's path.
-            const memoryResponse = await fetch("/api/memories", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(memory)
+
+            // Close when Escape is pressed.
+            function handleEscape(event) {
+
+                if (event.key === "Escape") {
+                    closeMemory();
+                }
+            }
+
+
+            closeButton.addEventListener(
+                "click",
+                closeMemory
+            );
+
+            details.appendChild(closeButton);
+
+
+            // Display the expanded photograph.
+            if (memory.image_path) {
+
+                const photo = document.createElement("img");
+
+                photo.src = memory.image_path;
+                photo.alt = memory.title || "Hawaii memory";
+                photo.className = "expanded-photo";
+
+                details.appendChild(photo);
+            }
+
+
+            // Display the memory title.
+            const title = document.createElement("h2");
+
+            title.textContent =
+                memory.title || "Untitled Memory";
+
+            details.appendChild(title);
+
+
+            // Display the date if available.
+            if (memory.memory_date) {
+
+                const date = document.createElement("p");
+
+                date.textContent = memory.memory_date;
+
+                details.appendChild(date);
+            }
+
+
+            // Display the location if available.
+            if (memory.location) {
+
+                const location = document.createElement("p");
+
+                location.textContent = memory.location;
+
+                details.appendChild(location);
+            }
+
+
+            // Display the description if available.
+            if (memory.description) {
+
+                const description =
+                    document.createElement("p");
+
+                description.textContent = memory.description;
+
+                details.appendChild(description);
+            }
+
+
+            // Add the expanded memory to the overlay.
+            overlay.appendChild(details);
+
+            document.body.appendChild(overlay);
+
+
+            // Close when clicking outside the memory.
+            overlay.addEventListener("click", event => {
+
+                if (event.target === overlay) {
+                    closeMemory();
+                }
             });
 
-            if (!memoryResponse.ok) {
-                throw new Error("Failed to add memory");
-            }
 
-            form.reset();
-            loadMemories();
+            // Listen for the Escape key.
+            document.addEventListener(
+                "keydown",
+                handleEscape
+            );
 
-        } catch (error) {
-
-            console.error(error);
-            alert(error.message);
-
-        } finally {
-
-            submitButton.disabled = false;
-
+            // Move keyboard focus to the close button.
+            closeButton.focus();
         }
-    });
 
 
-
+        // Load existing memories when the page opens.
         loadMemories();
 
     </script>
