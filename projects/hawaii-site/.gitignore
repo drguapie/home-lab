@@ -1,3 +1,5 @@
 .env
 image/
 uploads/
+__pycache__/
+*.pyc

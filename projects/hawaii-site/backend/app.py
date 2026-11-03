@@ -5,11 +5,13 @@ import uuid
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from PIL import Image, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 from io import BytesIO
 
+register_heif_opener()
 app = Flask(__name__)
 UPLOAD_FOLDER = Path("/app/uploads")
-ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic", "heif"}
 
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
@@ -205,16 +207,33 @@ def upload_photo():
         "jpg": {"JPEG", "MPO"},
         "jpeg": {"JPEG", "MPO"},
         "png": {"PNG"},
-        "webp": {"WEBP"}
+        "webp": {"WEBP"},
+        "heic": {"HEIF"},
+        "heif": {"HEIF"}
     }
 
     if detected_format not in expected_formats[extension]:
         return jsonify({"error": "Image format does not match extension"}), 400
 
-    filename = f"{uuid.uuid4().hex}.{extension}"
+    if extension in {"heic", "heif"}:
+        try:
+            with Image.open(BytesIO(image_bytes)) as image:
+                image.load()
+                image = image.convert("RGB")
 
-    with open(UPLOAD_FOLDER / filename, "wb") as saved_file:
-        saved_file.write(image_bytes)
+                filename = f"{uuid.uuid4().hex}.jpg"
+                image.save(
+                    UPLOAD_FOLDER / filename,
+                    format="JPEG",
+                    quality=90
+                )
+        except (UnidentifiedImageError, OSError, ValueError):
+            return jsonify({"error": "Unable to convert HEIF image"}), 400
+    else:
+        filename = f"{uuid.uuid4().hex}.{extension}"
+
+        with open(UPLOAD_FOLDER / filename, "wb") as saved_file:
+            saved_file.write(image_bytes)
 
     return jsonify({
         "message": "Photo uploaded successfully",
