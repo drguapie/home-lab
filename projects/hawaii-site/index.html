@@ -30,6 +30,9 @@
 
     <script>
 
+        // Track which Polaroid is currently on top.
+        let highestZIndex = 1;
+
         // Retrieve memories from the Flask API.
         async function loadMemories() {
 
@@ -56,6 +59,11 @@
                         document.createElement("div");
 
                     memoryElement.className = "polaroid";
+
+                    // Allow independent movement while preserving Flexbox.
+                    memoryElement.style.position = "relative";
+
+                    // Make the Polaroid keyboard accessible.
                     memoryElement.tabIndex = 0;
 
                     memoryElement.setAttribute("role", "button");
@@ -64,6 +72,109 @@
                         "aria-label",
                         "Open memory: " + (memory.title || "Untitled Memory")
                     );
+
+
+                    // ==========================================
+                    // POLAROID DRAGGING FUNCTIONALITY
+                    // ==========================================
+
+                    // Track the pointer's previous position.
+                    let startX = 0;
+                    let startY = 0;
+
+                    // Track the Polaroid's current position.
+                    let currentX = 0;
+                    let currentY = 0;
+
+                    // Track whether the pointer is pressed.
+                    let isDragging = false;
+
+                    // Track whether movement exceeded the click threshold.
+                    let hasMoved = false;
+
+                    // Minimum movement required to count as dragging.
+                    const dragThreshold = 5;
+
+
+                    // Detect when someone grabs a Polaroid.
+                    memoryElement.addEventListener("pointerdown", event => {
+
+                        // Only respond to the primary mouse button.
+                        if (event.pointerType === "mouse" && event.button !== 0) {
+                            return;
+                        }
+
+                        startX = event.clientX;
+                        startY = event.clientY;
+
+                        isDragging = true;
+                        hasMoved = false;
+                        // Bring the selected photograph above every other Polaroid.
+                        highestZIndex++;
+                        memoryElement.style.zIndex = highestZIndex;
+
+                        // Keep receiving events if the pointer leaves the photo.
+                        memoryElement.setPointerCapture(event.pointerId);
+
+                    });
+
+
+                    // Move the Polaroid while dragging.
+                    memoryElement.addEventListener("pointermove", event => {
+
+                        if (!isDragging) {
+                            return;
+                        }
+
+                        const deltaX = event.clientX - startX;
+                        const deltaY = event.clientY - startY;
+
+                        // Detect movement beyond a normal click.
+                        if (
+                            Math.abs(deltaX) > dragThreshold ||
+                            Math.abs(deltaY) > dragThreshold
+                        ) {
+                            hasMoved = true;
+                        }
+
+                        // Only move after dragging has been detected.
+                        if (hasMoved) {
+
+                            currentX += deltaX;
+                            currentY += deltaY;
+
+                            memoryElement.style.left = currentX + "px";
+                            memoryElement.style.top = currentY + "px";
+
+                        }
+
+                        // Remember the latest pointer position.
+                        startX = event.clientX;
+                        startY = event.clientY;
+
+                    });
+
+
+                    // Stop dragging when the pointer is released.
+                    memoryElement.addEventListener("pointerup", event => {
+
+                        isDragging = false;
+
+                    });
+
+
+                    // Handle interrupted dragging.
+                    memoryElement.addEventListener("pointercancel", () => {
+
+                        isDragging = false;
+                        hasMoved = false;
+
+                    });
+
+
+                    // ==========================================
+                    // POLAROID PHOTOGRAPH
+                    // ==========================================
 
                     // Display only the photograph on the scrapbook.
                     if (memory.image_path) {
@@ -74,6 +185,9 @@
                         photo.src = memory.image_path;
                         photo.alt = memory.title || "Hawaii memory";
                         photo.className = "memory-image";
+
+                        // Prevent the browser's native image dragging.
+                        photo.draggable = false;
 
                         memoryElement.appendChild(photo);
 
@@ -86,12 +200,28 @@
                         placeholder.textContent = "No photograph";
 
                         memoryElement.appendChild(placeholder);
+
                     }
 
-                    // Open the expanded memory when clicked.
-                    memoryElement.addEventListener("click", () => {
+
+                    // ==========================================
+                    // OPEN EXPANDED MEMORY
+                    // ==========================================
+
+                    memoryElement.addEventListener("click", event => {
+
+                        // Do not open the memory after dragging.
+                        if (hasMoved) {
+
+                            hasMoved = false;
+                            return;
+
+                        }
+
                         openMemory(memory);
+
                     });
+
 
                     // Allow keyboard users to open memories.
                     memoryElement.addEventListener("keydown", event => {
@@ -103,9 +233,13 @@
 
                             event.preventDefault();
                             openMemory(memory);
+
                         }
+
                     });
 
+
+                    // Add the Polaroid to the gallery.
                     memoriesContainer.appendChild(memoryElement);
 
                 });
@@ -116,11 +250,15 @@
 
                 memoriesContainer.textContent =
                     "Unable to load memories. Please try again later.";
+
             }
         }
 
 
-        // Open a memory in an expanded overlay.
+        // ==========================================
+        // EXPANDED MEMORY OVERLAY
+        // ==========================================
+
         function openMemory(memory) {
 
             const overlay = document.createElement("div");
@@ -139,6 +277,7 @@
 
             // Remember which element was selected before opening.
             const previousFocus = document.activeElement;
+
 
             // Create the close button.
             const closeButton = document.createElement("button");
@@ -169,6 +308,7 @@
                 ) {
                     previousFocus.focus();
                 }
+
             }
 
 
@@ -178,6 +318,7 @@
                 if (event.key === "Escape") {
                     closeMemory();
                 }
+
             }
 
 
@@ -199,6 +340,7 @@
                 photo.className = "expanded-photo";
 
                 details.appendChild(photo);
+
             }
 
 
@@ -219,6 +361,7 @@
                 date.textContent = memory.memory_date;
 
                 details.appendChild(date);
+
             }
 
 
@@ -230,6 +373,7 @@
                 location.textContent = memory.location;
 
                 details.appendChild(location);
+
             }
 
 
@@ -242,6 +386,7 @@
                 description.textContent = memory.description;
 
                 details.appendChild(description);
+
             }
 
 
@@ -257,6 +402,7 @@
                 if (event.target === overlay) {
                     closeMemory();
                 }
+
             });
 
 
@@ -268,6 +414,7 @@
 
             // Move keyboard focus to the close button.
             closeButton.focus();
+
         }
 
 

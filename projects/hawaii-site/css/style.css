@@ -2,7 +2,7 @@
 
 body {
     font-family: Arial, sans-serif;
-   background-color: #ffffff
+   background-color: #ffffff;
     color: #222222;
     margin: 0;
     padding: 40px 20px;
@@ -167,5 +167,11 @@ section {
 }
 
 .polaroid {
-    cursor: pointer;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.polaroid:active {
+    cursor: grabbing;
 }
